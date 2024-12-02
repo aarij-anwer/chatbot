@@ -1,17 +1,17 @@
+from flask import Flask, request, Response
+from flask_cors import CORS
 from dotenv import load_dotenv
 import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS  # Import CORS
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
-# Load environment variables from .env
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Enable CORS for frontend access
 
-# Read the NVIDIA API key from the environment
+# Read the NVIDIA API key
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 if not NVIDIA_API_KEY:
     raise ValueError("NVIDIA_API_KEY environment variable not set!")
@@ -19,38 +19,37 @@ if not NVIDIA_API_KEY:
 # Initialize the NVIDIA model
 model = ChatNVIDIA(model="meta/llama3-70b-instruct", api_key=NVIDIA_API_KEY)
 
-# Store conversation history (in-memory, for now)
+# Store conversation history
 conversations = {}
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    user_id = request.json.get('user_id')  # Unique identifier for the user
-    user_message = request.json.get('message')
-    language = request.json.get('language', 'English')  # Default to English
+@app.route('/chat-stream', methods=['GET'])
+def chat_stream():
+    user_id = request.args.get('user_id')
+    user_message = request.args.get('message')
+    language = request.args.get('language', 'English')  # Default to English
 
     if not user_message or not user_id:
-        return jsonify({"error": "Both 'user_id' and 'message' are required"}), 400
+        return Response("Invalid parameters", status=400)
 
     # Initialize conversation history if user is new
     if user_id not in conversations:
-        # Add system message with the language context
         conversations[user_id] = [
             SystemMessage(content=f"You are a helpful assistant. Answer all questions to the best of your ability in {language}.")
         ]
 
-    try:
-        # Add user's message to history
-        conversations[user_id].append(HumanMessage(content=user_message))
+    # Add user's message to conversation history
+    conversations[user_id].append(HumanMessage(content=user_message))
 
-        # Generate response
-        response = model.invoke(conversations[user_id])
+    # Stream the response from the model
+    def generate_response():
+        try:
+            response = model.invoke(conversations[user_id])
+            for word in response.content.split():  # Stream word-by-word
+                yield f"data: {word}\n\n"  # SSE format
+        except Exception as e:
+            yield f"data: ERROR: {str(e)}\n\n"
 
-        # Add AI's response to history
-        conversations[user_id].append(AIMessage(content=response.content))
-
-        return jsonify({"response": response.content})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return Response(generate_response(), content_type="text/event-stream")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
