@@ -1,11 +1,20 @@
+from dotenv import load_dotenv
+import os
 from flask import Flask, request, jsonify
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
+# Load environment variables from .env
+load_dotenv()
+
 app = Flask(__name__)
 
+# Read the NVIDIA API key from the environment
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+if not NVIDIA_API_KEY:
+    raise ValueError("NVIDIA_API_KEY environment variable not set!")
+
 # Initialize the NVIDIA model
-NVIDIA_API_KEY = "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"
 model = ChatNVIDIA(model="meta/llama3-70b-instruct", api_key=NVIDIA_API_KEY)
 
 # Store conversation history (in-memory, for now)
