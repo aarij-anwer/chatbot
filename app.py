@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # Import CORS
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
@@ -8,6 +9,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 # Read the NVIDIA API key from the environment
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")

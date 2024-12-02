@@ -2,3 +2,4 @@ flask
 langchain
 langchain-nvidia-ai-endpoints
 python-dotenv
+flask-cors
